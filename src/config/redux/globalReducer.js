@@ -28,7 +28,7 @@ const globalState = {
   ilang: false,
   nip_otor: '',
   badgeOtorPerjadin: 0,
-  appVersion: '3.02',
+  appVersion: '3.01',
 };
 
 const rootReducer = (state = globalState, action) => {

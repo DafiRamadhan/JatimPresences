@@ -1,4 +1,4 @@
-export const RootPathJP = 'https://sriwijaya.bankjatim.co.id/jp_api/rest/v1/';
+export const RootPathJP = 'https://majapahit.bankjatim.co.id/jp_api/rest/v1/';
 export const HeadersAPIJP = {
   // "content-type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW",
   'content-type': 'application/json',
