@@ -1,0 +1,30 @@
+workflows:
+  ios-build:
+    name: iOS Build for TestFlight
+    environment:
+      vars:
+        XCODE_WORKSPACE: "JatimPresences.xcworkspace"
+        XCODE_SCHEME: "JatimPresences"
+        APP_STORE_CONNECT_TEAM_ID: "W98H4R8DD7"
+        APP_STORE_CONNECT_APPLE_ID: "muhammaddafiramadhan@gmail.com"
+      node: latest
+      xcode: latest
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install --force
+          cd ios && pod install && cd ..
+      - name: Build iOS app
+        script: |
+          xcodebuild -workspace "ios/$XCODE_WORKSPACE" \
+          -scheme "$XCODE_SCHEME" \
+          -configuration Release \
+          -sdk iphoneos \
+          -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive archive
+
+          xcodebuild -exportArchive \
+          -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive \
+          -exportOptionsPlist ios/exportOptions.plist \
+          -exportPath $CM_BUILD_DIR/ipa
+    artifacts:
+      - build/ios/ipa/*.ipa
