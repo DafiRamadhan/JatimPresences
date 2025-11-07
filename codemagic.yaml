@@ -1,19 +1,17 @@
 workflows:
   ios-build:
-    name: iOS Build for TestFlight
+    name: iOS Build (IPA only, no upload)
     environment:
       vars:
         XCODE_WORKSPACE: "JatimPresences.xcworkspace"
         XCODE_SCHEME: "JatimPresences"
-        APP_STORE_CONNECT_TEAM_ID: "W98H4R8DD7"
-        APP_STORE_CONNECT_APPLE_ID: "muhammaddafiramadhan@gmail.com"
       node: latest
       xcode: latest
     scripts:
       - name: Install dependencies
         script: |
           npm install --force
-          
+
           cd node_modules/react-native/scripts
           chmod +x ios-install-third-party.sh
           ./ios-install-third-party.sh
@@ -29,18 +27,34 @@ workflows:
           ./ios-install-third-party.sh
 
           cd ../../../ios
+          rm -rf Pods Podfile.lock
+          pod deintegrate
           pod install --repo-update
-      - name: Build iOS app
+      - name: Build iOS app (no signing)
         script: |
-          xcodebuild -workspace "ios/$XCODE_WORKSPACE" \
-          -scheme "$XCODE_SCHEME" \
-          -configuration Release \
-          -sdk iphoneos \
-          -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive archive
+          cd ios
+          xcodebuild clean
 
-          xcodebuild -exportArchive \
-          -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive \
-          -exportOptionsPlist ios/exportOptions.plist \
-          -exportPath $CM_BUILD_DIR/ipa
+          xcodebuild \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+            xcodebuild \
+            -exportArchive \
+            -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive \
+            -exportPath $CM_BUILD_DIR/ipa \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+
     artifacts:
-      - build/ios/ipa/*.ipa
+      - $CM_BUILD_DIR/ipa/*.ipa
