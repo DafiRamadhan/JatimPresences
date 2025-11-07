@@ -13,7 +13,23 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --force
-          cd ios && pod install && cd ..
+          
+          cd node_modules/react-native/scripts
+          chmod +x ios-install-third-party.sh
+          ./ios-install-third-party.sh
+
+          cd third-party/glog-0.3.5
+          rm -f missing
+          autoreconf -fiv || true
+          sed -i '' 's/armv7/arm64/g' ../../ios-configure-glog.sh
+          sed -i '' 's/return ac_fn_c_try_compile/echo skip compile test; return 0/' configure
+
+          cd ../../
+          chmod +x ios-install-third-party.sh
+          ./ios-install-third-party.sh
+
+          cd ../../../ios
+          pod install --repo-update
       - name: Build iOS app
         script: |
           xcodebuild -workspace "ios/$XCODE_WORKSPACE" \
