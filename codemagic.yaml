@@ -5,13 +5,14 @@ workflows:
       vars:
         XCODE_WORKSPACE: "JatimPresences.xcworkspace"
         XCODE_SCHEME: "JatimPresences"
-        EXPORT_OPTIONS_PLIST: "$CM_BUILD_DIR/exportOptions.plist"
+        USE_MODERN_BUILD_SYSTEM: "NO"
       node: latest
       xcode: latest
     scripts:
       - name: Install dependencies
         script: |
           npm install --force
+          brew install autoconf automake libtool || true
 
           cd node_modules/react-native/scripts
           chmod +x ios-install-third-party.sh
@@ -27,14 +28,47 @@ workflows:
           chmod +x ios-install-third-party.sh
           ./ios-install-third-party.sh
 
-          cd ../../../ios
+          cd ../ReactCommon/yoga/yoga
+          if ! grep -q 'clang diagnostic ignored' Yoga.cpp; then
+            printf '%s\n' '#ifdef __clang__' \
+              '#pragma clang diagnostic ignored "-Wc++17-extensions"' \
+              '#pragma clang diagnostic ignored "-Wunused-parameter"' \
+              '#endif' > /tmp/yoga_header.txt
+
+            cat /tmp/yoga_header.txt Yoga.cpp > /tmp/Yoga.new && mv /tmp/Yoga.new Yoga.cpp
+
+            rm -f /tmp/yoga_header.txt
+            echo "Patched Yoga.cpp"
+          else
+            echo "Yoga.cpp is already patched"
+          fi
+
+          cd ../../../../../ios
           rm -rf Pods Podfile.lock
           pod deintegrate
           pod install --repo-update
+
+          echo "Cleaning DerivedData..."
+          rm -rf ~/Library/Developer/Xcode/DerivedData || true
+
+          echo "Rechecking Yoga patch after pod install..."
+          cd ../node_modules/react-native/ReactCommon/yoga/yoga
+          if ! grep -q 'clang diagnostic ignored' Yoga.cpp; then
+            echo "Yoga.cpp patch missing, re-injecting header..."
+            printf '%s\n' '#ifdef __clang__' \
+              '#pragma clang diagnostic ignored "-Wc++17-extensions"' \
+              '#pragma clang diagnostic ignored "-Wunused-parameter"' \
+              '#endif' | cat - Yoga.cpp > /tmp/Yoga.new && mv /tmp/Yoga.new Yoga.cpp
+          else
+            echo "Yoga.cpp already patched"
+          fi
+
+          echo "Verifying patch line count:"
+          grep -n 'clang diagnostic ignored' Yoga.cpp || echo "Yoga patch not found!"
       - name: Build iOS app (no signing)
         script: |
           cd ios
-          xcodebuild clean
+          xcodebuild clean -workspace "$XCODE_WORKSPACE" -scheme "$XCODE_SCHEME" || true
 
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
@@ -43,15 +77,26 @@ workflows:
             -sdk iphoneos \
             -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive \
             archive \
+            IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+            GCC_C_LANGUAGE_STANDARD=gnu11 \
+            CLANG_CXX_LANGUAGE_STANDARD=c++14 \
+            CLANG_CXX_LIBRARY=libc++ \
+            CLANG_ENABLE_MODULES=NO \
+            DEAD_CODE_STRIPPING=NO \
+            OTHER_CFLAGS="-Wno-error -Wno-shorten-64-to-32 -Wno-comma -Wno-nullability-completeness -Wno-range-loop-analysis -Wno-unreachable-code-break -Wno-unused-variable -Wno-unqualified-std-cast-call -Wno-c++11-narrowing" \
+            OTHER_CPLUSPLUSFLAGS="-std=c++14 -fno-modules -fno-autolink -Wno-c++17-extensions -Wno-unused-parameter -Wno-deprecated-declarations -Wno-ambiguous-reversed-operator -Wno-unqualified-std-cast-call -Wno-nullability-completeness -Wno-c++11-narrowing -Wno-c++98-compat -Wno-comma -Wno-inconsistent-missing-destructor-override" \
+            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES
 
-            xcodebuild \
+          xcodebuild \
             -exportArchive \
             -archivePath $CM_BUILD_DIR/JatimPresences.xcarchive \
             -exportPath $CM_BUILD_DIR/ipa \
-            -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
+            -exportOptionsPlist exportOptions.plist \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
